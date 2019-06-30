@@ -28,15 +28,17 @@ The dataset was separated into a training set and a test set. 75% of the dataset
 ### CART Tree:
 
 * ROC against the complexity parameter:
-
+![CART Tree](https://github.com/lizarova777/Prediction_Project/blob/master/CartFit.png)
 
 ### C4.5-Type (J48) Tree:
 
 * ROC against the complexity parameter:
+![J48 Tree](https://github.com/lizarova777/Prediction_Project/blob/master/J48Fit.png)
 
 ### C5.0 Tree:
 
 * ROC against the confidence threshold:
+![C.50 Tree](https://github.com/lizarova777/Prediction_Project/blob/master/C50Fit.png)
 
 Then the models were compared using the following code, which generated a model summary:
 
