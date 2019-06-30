@@ -1,0 +1,226 @@
+---
+title: "Prediction"
+author: "Anna Lizarov"
+date: "February 7, 2019"
+output: html_document
+---
+```{r}
+#Libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(caret)
+library(RWeka)
+library(C50)
+```
+
+## Data
+
+The data comes from a university registrar's office. The code book for the variables are available in the file code-book.txt. Examine the variables and their definitions.
+
+Upload the drop-out.csv data into R as a data frame. 
+
+```{r}
+D <- as.data.frame(read.csv("drop-out.csv", header=TRUE))
+```
+
+The next step is to separate your data set into a training set and a test set. Randomly select 25% of the students to be the test data set and leave the remaining 75% for your training data set. (Hint: each row represents an answer, not a single student.)
+
+```{r}
+set.seed(123)
+trainData <- createDataPartition(
+  y = D$complete, ## the outcome data are needed
+  p = .75, ## The percentage of data in the training set
+  list = FALSE)
+TRAIN1 <- D[ trainData,]
+TEST1 <-D[-trainData,]
+```
+
+For this assignment you will be predicting the student level variable "complete". 
+(Hint: make sure you understand the increments of each of your chosen variables, this will impact your tree construction)
+
+Visualize the relationships between your chosen variables as a scatterplot matrix.  Save your image as a .pdf named scatterplot_matrix.pdf. Based on this visualization do you see any patterns of interest? Why or why not?
+
+```{r}
+D1 <- D %>% mutate(complete=ifelse(complete=="yes", 1,0)) %>% mutate(international=ifelse(international=="yes", 1,0)) %>% mutate(online=ifelse(online=="yes", 1,0))
+
+#Scatterplot matrix
+pdf("scatterplot_matrix.pdf")
+pairs(D1)
+dev.off()
+```
+
+```{r}
+#Interpretation: Based on the scatterplot matrix, there seems to be a relationship between the variables "years" and "complete". In particular, students who have spent less time enrolled in the program, completed the course as oppose to those who spent greater amount of time enrolled in the program. This suggests that the shorter amount of time the student has been enrolled in program, the more likely he or she completed a course. In other words, there is a negative relationship between these two features. There is also a relationship between the variables "entrance_test_score" and "courses_taken". Students, who have taken more courses while in enrolled the program, have a lower entrance exam test score as opposed to students who have taken only a few courses. Moreover, there is a relationship between the variables "years" and "entrance_test_score". Students with higher entrance exam test score spent fewer years in the program. Likewise, students, who have taken only online courses, spent fewer years in the program. Also, international students have taken fewer courses than non-international students while enrolled in the program. 
+
+```
+
+
+## CART Trees
+
+Construct a classification tree that predicts complete using the caret package.
+
+```{r}
+TRAIN2 <- TRAIN1[,c(2:10)] #Remove the student_id variable that we do not want to use in the model
+#Define the control elements we would like to use
+ctrl <- trainControl(method = "repeatedcv", #Tell caret to perform 10-fold cross validation
+                repeats = 3, #Tell caret to repeat each fold three times
+                classProbs = TRUE, #Calculate class probabilities for ROC calculation
+                summaryFunction = twoClassSummary)
+
+#Define the model
+cartFit <- train(complete ~ ., #Define which variable to predict 
+                data = TRAIN2, #Define the data set to train the model on
+                trControl = ctrl, #Tell caret the control elements
+                method = "rpart", #Define the model type
+                metric = "ROC", #Tell caret to calculate the ROC curve
+                preProc = c("center", "scale")) #Center and scale the data to minimize the 
+
+#Check the results
+cartFit
+                
+#Plot ROC against complexity 
+plot(cartFit)
+
+```
+
+Describe important model attribues of your tree. Do you believe it is a successful model of student performance, why
+/why not?
+
+```{r}
+#Interpretation: The final value of cp that was used for this model was 0.012. The corresponding value of ROC to this cp is 0.8844. This suggests that there is a 88.44% probability of a randomly selected student from a "completed" group being classified as "completed" as opposed to a randomly selected student from a "not completed" group being classified as "completed", which is fairly high. The specificity, also known as the true negative rate, of the model is 0.9955. This suggests that the rate of a correct classification of students who have not completed a course is 99.55%. However, the sensitivity, also known as the true positive rate, of the model is 0.6576. This indicates that the rate of a correct classification of students who have completed a course is only 65.76%. This means that some students, who have completed the course, where incorrectly classified as "not completed". From this, it can be said that this model of student performance is not successful. 
+```
+
+
+What does the plot represent? What information does this plot tell us?
+
+
+```{r}
+#Interpretation: This plot illustrates the value of ROC for each complexity parameter (cp) value or threshold. CP measures the cost in prediction error of adding a node to a tree. In the case of this model, the final value for cp was 0.012, where the ROC is optimal or at its peak. For the cp values greater than 0.012, there is a decreasing trend in the ROC values. As in, as the cp value increases, the ROC decreases. In other words, the less nodes there are in a tree, the poorer the prediction.
+
+```
+
+Now predict results from the test data and describe import attributes of this test. Do you believe it is a successful model of student performance, why/why not?
+
+```{r}
+TEST2 <- TEST1[,c(2:10)] #Remove the student_id variable that we do not want to use in the model
+
+#Generate prediction using previously trained model
+cartClasses <- predict(cartFit, newdata = TEST2)
+
+#Generate model statistics
+confusionMatrix(data = cartClasses, TEST2$complete)
+
+```
+
+```{r}
+#Interpretation: The overall accuracy of the model is 0.8942 or 89.42%, which is significant or considerable. The value of the specificity is 0.9971. This means that the rate of a successful prediction of students who have not completed a course is a high value of 99.71%. However, the value of sensitivty is 0.6473. In other words, the rate of a successful prediction of students who have completed a course is only 64.73%. This implies that the model needs improvement. 
+```
+
+
+## C4.5-Type Trees
+
+You will now repeat the same prediction but using a different tree-based algorithm called [J48](). J48 is a Java implementation of the C4.5 decsion tree algorithm of [Quinlan (1993)](). 
+
+How does the C4.5 algorithm differ from the CART algorithm?
+```{r}
+#Answer: There are several differences between the C4.5 algorithm and the CART algorithm. First, the way these algorithms handle training data with missing values differs. Second, there is a difference in terms of the decision tree pruning. In particular, C4.5 algorithm utilizes the error based prunning, while the CART algorithm uses the cost complexity prunning. Moreover, it differs from the CART algoritm when it comes to entropy. The splitting criteria for the CART algorithm is the towing criteria while the splitting criteria for the C4.5 algorithm is the information gain. Furthermore, CART algorithm can only create binary trees while the C4.5 can have more than two splits per node. However, it can handle outliers unlike the C4.5 algorithm.  
+```
+
+
+Train the J48 model on the same training data and examine your results.
+```{r}
+ctrl <- trainControl(method = "repeatedcv",
+                repeats = 3,
+                classProbs = TRUE,
+                summaryFunction = twoClassSummary)
+
+j48Fit <- train(complete ~ .,
+                data = TRAIN2,
+                trControl = ctrl,
+                method = "J48",
+                metric = "ROC",
+                preProc = c("center", "scale"))
+
+j48Fit
+
+plot(j48Fit)
+```
+
+Describe important model attribues of your tree. Do you believe it is a successful model of student performance, why/why not?
+```{r}
+#Interpretation: The final confidence threshold (C) value that was used for this model was 0.5 with minimum of 3 instances per leaf (M=3).The ROC value of this model is 0.9071, which means that there is a 90.71% probability of a randomly selected student from a "completed" group being predictied as "completed" as opposed to a randomly selected student from a "not completed" group being predicted as "completed", which is a high percentage. The ROC value for this model is higher than that of the CART model. Furthermore, the sensitivity value of 0.6989 means that the rate of a successful prediction of students who have completed a course is 69.89% as opposed to CART model's true positive rate of 65.76%. However, the rate of a successful prediction of students who have not completed a course has decreased to 97.85%, which is indicated by the specificity value of 0.9785. This might be problematic as the model incorrectly predicted for some students who have not completed the course as "completed" given that "not completed" might be the behavior of interest for both the researchers and the educators. Nonetheless, overall, this model is better at predicting student performance than the CART model.   
+```
+
+
+What does the plot represent? What information does this plot tell us?
+
+```{r}
+#Interpretation: The plot illustrates that the optimal confidence threshold is 0.5 with a minimum of 3 instances or splits per leaf as it has the highest ROC values compared to a minimum of 2 instances per leaf and one instance per leaf. The plot shows that the divergence in ROC values for minimum instances per leaf begins at the confidence threshold of 0.25.   
+```
+
+
+Now test your new J48 model by predicting the test data and generating model fit statistics.
+
+```{r}
+j48Classes <- predict(j48Fit, newdata = TEST2)
+
+confusionMatrix(data = j48Classes, TEST2$complete)
+```
+
+
+There is an updated version of the C4.5 model called C5.0, it is implemented in the C50 package. What improvements have been made to the newer version? 
+```{r}
+#Answer: C5.0 utilizes the boosting iterations technique, which combines multiple variables or features in order to improve the accuracy of the model. Furthermore, C5.0 algortihm automatically winnows the data features before constructing a classifier. As in, within the cross-validation loop, it purposefully removes the predictors that can improve the accuracy of the predictive model. Also, it provides two following model types: rules and tree. Unlike the tree-based model, the rule-based model breaks down the constructed tree  into mutually exclusive rules, which are then pruned until the model reaches the optimal ROC value. 
+```
+
+Install the C50 package, train and then test the C5.0 model on the same data.
+
+```{r}
+c50Fit <- train(complete ~ .,
+                data = TRAIN2,
+                trControl = ctrl,
+                method = "C5.0",
+                metric = "ROC",
+                preProc = c("center", "scale"))
+
+c50Fit
+
+plot(c50Fit)
+
+```
+
+```{r}
+#Generate prediction using previously trained model
+c50Classes <- predict(c50Fit, newdata = TEST2)
+
+#Generate model statistics
+confusionMatrix(data = c50Classes, TEST2$complete)
+```
+
+## Compare the models
+
+caret allows us to compare all three models at once.
+
+```{r}
+resamps <- resamples(list(cart = cartFit, jfoureight = j48Fit, cfiveo = c50Fit))
+summary(resamps)
+```
+
+What does the model summary tell us? Which model do you believe is the best?
+```{r}
+#Interpretation: The model summary displays the summary descriptive statistics of the metrics ROC, sensitivity, and specificity for each of the models. In other words, it compares the three models based on the distribution of the values of ROC, sensitivity, and specificity. Based on the model summary, C5.0 model has the highest average ROC, C4.5 model has the highest average sensitivity, and the CART model has the highest average specificity. Furthermore, the CART model has the lowest average ROC and sensiitvity. Nonetheless, the C5.0 model has a greater variation in regards to the sensitivity and specificity compared to the other models while the C4.5 model has the least variation in regards to the distribution of these metrics. Thus, the C4.5 model is the best in predicting whether students will complete the course. 
+```
+
+
+Which variables (features) within your chosen model are important, do these features provide insights that may be useful in solving the problem of students dropping out of courses?
+```{r}
+variables <- varImp(j48Fit)
+plot(variables)
+```
+
+
+```{r}
+#Interpretation: Based on the plot, the variable "years", as in, the amount of years the student was enrolled in a program has the greatest importance in predicting whether the student will complete the course or dropout. Furthermore, it is the only variable that has a significant importance in the model. This was also shown in scatterplot matrix, where the the variable "complete" was only related to the number of years the student was enrolled in the program. Hence, this variable can provide insights when it comes students dropping out of a course. 
+```
+

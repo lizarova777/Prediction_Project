@@ -1,0 +1,216 @@
+---
+title: "Prediction: Comparing Tress"
+author: "Charles Lang"
+date: "1/9/2018"
+output: html_document
+---
+
+In this assignment you will modelling student data using three flavors of tree algorithm: CART, C4.5 and C5.0. We will be using these algorithms to attempt to predict which students drop out of courses. Many universities have a problem with students over-enrolling in courses at the beginning of semester and then dropping most of them as the make decisions about which classes to attend. This makes it difficult to plan for the semester and allocate resources. However, schools don't want to restrict the choice of their students. One solution is to create predictions of which students are likley to drop out of which courses and use these predictions to inform semester planning. 
+
+In this assignment we will be using the tree algorithms to build models of which students are likely to drop out of which classes. 
+
+## Software
+
+In order to generate our models we will need several packages. The first package you should install is [caret](https://cran.r-project.org/web/packages/caret/index.html). (https://topepo.github.io/caret/train-models-by-tag.html)(https://cran.r-project.org/web/packages/caret/vignettes/caret.pdf)
+
+There are many prediction packages available and they all have slightly different syntax. caret is a package that brings all the different algorithms under one hood using the same syntax. 
+
+We will also be accessing an algorithm from the [Weka suite](https://www.cs.waikato.ac.nz/~ml/weka/). Weka is a collection of machine learning algorithms that have been implemented in Java and made freely available by the University of Waikato in New Zealand. To access these algorithms you will need to first install both the [Java Runtime Environment (JRE) and Java Development Kit](http://www.oracle.com/technetwork/java/javase/downloads/jre9-downloads-3848532.html) on your machine. You can then then install the [RWeka](https://cran.r-project.org/web/packages/RWeka/index.html) package within R.
+
+(Issue 1: failure to install RWeka/RWekajars, paste "sudo R CMD javareconf" into terminal and try to install again)
+
+**Weka requires Java and Java causes problems. If you cannot install Java and make Weka work, please follow the alternative instructions at line 121**
+
+The last package you will need is [C50](https://cran.r-project.org/web/packages/C50/index.html)
+
+## Data
+
+The data comes from a university registrar's office. The code book for the variables are available in the file code-book.txt. Examine the variables and their definitions.
+
+Upload the drop-out.csv data into R as a data frame. 
+
+```{r}
+D1 <- read.csv("drop-out.csv", header = TRUE)
+```
+
+The next step is to separate your data set into a training set and a test set. Randomly select 25% of the students to be the test data set and leave the remaining 75% for your training data set. (Hint: each row represents an answer, not a single student.)
+
+```{r}
+library(dplyr)
+
+SAMPLE <- data.frame(sample(unique(D1$student_id), 511))
+names(SAMPLE) <- c("student_id")
+
+TRAIN1 <- inner_join(D1, SAMPLE, by = "student_id")
+TEST1 <- anti_join(D1, SAMPLE, by = "student_id")
+
+
+```
+
+For this assignment you will be predicting the student level variable "complete". 
+(Hint: make sure you understand the increments of each of your chosen variables, this will impact your tree construction)
+
+```{r}
+ 
+```
+
+Visualize the relationships between your chosen variables as a scatterplot matrix.  Save your image as a .pdf named scatterplot_matrix.pdf. Based on this visualization do you see any patterns of interest? Why or why not?
+
+```{r}
+
+```
+
+## CART Trees
+
+In HUDK4050 we used the [rpart package](https://cran.r-project.org/web/packages/rpart/rpart.pdf) to generate CART tree models. Review your work using this package if you cannot remember how the trees are constructed. 
+
+Construct a classification tree that predicts complete using the caret package.
+
+```{r}
+library(caret)
+
+TRAIN2 <- TRAIN1[,c(2:10)] #Remove the student_id variable that we do not want to use in the model
+
+#Define the control elements we would like to use
+ctrl <- trainControl(method = "repeatedcv", #Tell caret to perform 10-fold cross validation
+                repeats = 3, #Tell caret to repeat each fold three times
+                classProbs = TRUE, #Calculate class probabilities for ROC calculation
+                summaryFunction = twoClassSummary)
+
+#Define the model
+cartFit <- train(complete ~ ., #Define which variable to predict 
+                data = TRAIN2, #Define the data set to train the model on
+                trControl = ctrl, #Tell caret the control elements (EG - the cross validation)
+                method = "rpart", #Define the model type
+                metric = "ROC", #Tell caret to calculate the ROC curve
+                preProc = c("center", "scale")) #Center and scale the data to minimize the 
+
+#Check the results
+cartFit
+                
+#Plot ROC against complexity 
+plot(cartFit)
+
+```
+
+Describe important model attribues of your tree. Do you believe it is a successful model of student performance, why/why not?
+
+What does the plot represent? What information does this plot tell us?
+
+Now predict results from the test data and describe import attributes of this test. Do you believe it is a successful model of student performance, why/why not?
+
+```{r}
+TEST2 <- TEST1[,c(2:10)] #Remove the student_id variable that we do not want to use in the model
+
+#Generate prediction using previously trained model
+cartClasses <- predict(cartFit, newdata = TEST2)
+
+#Generate model statistics
+confusionMatrix(data = cartClasses, TEST2$complete)
+
+```
+
+
+ 
+## C4.5-Type Trees
+
+You will now repeat the same prediction but using a different tree-based algorithm called [J48](). J48 is a Java implementation of the C4.5 decsion tree algorithm of [Quinlan (1993)](https://link.springer.com/article/10.1007%2FBF00993309). 
+
+How does the C4.5 algorithm differ from the CART algorithm?
+
+## IF YOU CANNOT MAKE WEKA WORK PLEASE SKIP TO LINE 154
+Train the J48 model on the same training data and examine your results.
+```{r}
+ctrl <- trainControl(method = "repeatedcv",
+                repeats = 3,
+                classProbs = TRUE,
+                summaryFunction = twoClassSummary)
+
+j48Fit <- train(complete ~ .,
+                data = TRAIN2,
+                trControl = ctrl,
+                method = "J48",
+                metric = "ROC",
+                preProc = c("center", "scale"))
+
+j48Fit
+
+plot(j48Fit)
+```
+Describe important model attribues of your tree. Do you believe it is a successful model of student performance, why/why not?
+
+What does the plot represent? What information does this plot tell us?
+
+Now test your new J48 model by predicting the test data and generating model fit statistics.
+
+```{r}
+
+j48Classes <- predict(j48Fit, newdata = TEST2)
+
+confusionMatrix(data = j48Classes, TEST2$complete)
+
+```
+
+## Alternative to Weka - if you made Weka work you can skip to line 179
+Train a Conditional Inference Tree using the `party` package on the same training data and examine your results.
+```{r}
+ctrl <- trainControl(method = "repeatedcv",
+                repeats = 3,
+                classProbs = TRUE,
+                summaryFunction = twoClassSummary)
+
+ctreeFit <- train(complete ~ .,
+                data = TRAIN2,
+                trControl = ctrl,
+                method = "ctree",
+                metric = "ROC",
+                preProc = c("center", "scale"))
+
+ctreeFit
+
+plot(ctreeFit)
+```
+Describe important model attribues of your tree. Do you believe it is a successful model of student performance, why/why not?
+
+What does the plot represent? What information does this plot tell us?
+
+Now test your new Conditional Inference model by predicting the test data and generating model fit statistics.
+
+##The C50 Tree
+
+There is an updated version of the C4.5 model called C5.0, it is implemented in the C50 package. What improvements have been made to the newer version? 
+
+Install the C50 package, train and then test the C5.0 model on the same data.
+
+```{r}
+c50Fit <- train(complete ~ .,
+                data = TRAIN2,
+                trControl = ctrl,
+                method = "C5.0",
+                metric = "ROC",
+                preProc = c("center", "scale"))
+
+c50Fit
+
+plot(c50Fit)
+
+c50Classes <- predict(c50Fit, newdata = TEST2)
+
+confusionMatrix(data = c50Classes, TEST2$complete)
+```
+
+
+
+
+## Compare the models
+
+caret allows us to compare all three models at once.
+
+```{r}
+resamps <- resamples(list(cart = cartFit, jfoureight = j48Fit, cfiveo = c50Fit))
+summary(resamps)
+```
+
+What does the model summary tell us? Which model do you believe is the best?
+
+Which variables (features) within your chosen model are important, do these features provide insights that may be useful in solving the problem of students dropping out of courses?
