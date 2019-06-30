@@ -4,7 +4,7 @@ Prediction of student behavior has been a prominant area of research in learning
 
 ## Project Objective:
 
-The purpose of this project was build models using CART, C4.5 and C5 classification algorithms to predict student course dropout and then compare these models based on validation metrics. 
+The purpose of this project was build models using CART, C4.5 and C5.0 classification algorithms to predict student course dropout and then compare these models based on validation metrics. 
 
 ## Dataset:
 
